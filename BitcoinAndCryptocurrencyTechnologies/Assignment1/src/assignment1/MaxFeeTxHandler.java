@@ -1,10 +1,18 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
 package assignment1;
 
-import assignment1.Transaction;
 import java.security.PublicKey;
 import java.util.ArrayList;
 
-public class TxHandler {
+/**
+ *
+ * @author can
+ */
+public class MaxFeeTxHandler {
     
     private UTXOPool utxoPool;
 
@@ -13,7 +21,7 @@ public class TxHandler {
      * {@code utxoPool}. This should make a copy of utxoPool by using the UTXOPool(UTXOPool uPool)
      * constructor.
      */
-    public TxHandler(UTXOPool utxoPool) {
+    public MaxFeeTxHandler(UTXOPool utxoPool) {
         this.utxoPool = new UTXOPool(utxoPool);
     }
 
@@ -26,7 +34,7 @@ public class TxHandler {
      * (5) the sum of {@code tx}s input values is greater than or equal to the sum of its output
      *     values; and false otherwise.
      */
-    public boolean isValidTx(Transaction tx) {
+    public double isValidTx(Transaction tx) {
         double sumOfInputValues = 0;
         double sumOfOutputValues = 0;
         
@@ -37,7 +45,7 @@ public class TxHandler {
             int prevOutputIndex = input.outputIndex;
             UTXO utxo = new UTXO(prevTransactionHash, prevOutputIndex);
             if (!this.utxoPool.contains(utxo)) { // case (1)
-                return false;
+                return -1;
             }
             
             Transaction.Output prevOutput = this.utxoPool.getTxOutput(utxo);
@@ -45,14 +53,14 @@ public class TxHandler {
             byte[] message = tx.getRawDataToSign(i);
             byte[] signature = input.signature;
             if (!Crypto.verifySignature(pubKey, message, signature)) { // case (2)
-                return false;
+                return -1;
             }
             
             for (int j = i+1; j < tx.numInputs(); j++) {
                 Transaction.Input anotherInputInList = tx.getInput(j);
                 UTXO anotherUtxo = new UTXO(anotherInputInList.prevTxHash, anotherInputInList.outputIndex);
                 if (utxo.equals(anotherUtxo)) { // case (3)
-                    return false;
+                    return -1;
                 }
             }
             
@@ -64,17 +72,17 @@ public class TxHandler {
             Transaction.Output output = tx.getOutput(i);
             
             if (output.value<0) { // case (4)
-                return false;
+                return -1;
             }
             
             sumOfOutputValues += output.value;
         }
         
         if (sumOfInputValues < sumOfOutputValues) { // case (5)
-            return false;
+            return -1;
         }
         
-        return true;
+        return sumOfInputValues - sumOfOutputValues;
     }
 
     /**
@@ -84,28 +92,16 @@ public class TxHandler {
      */
     public Transaction[] handleTxs(Transaction[] possibleTxs) {
         
-        ArrayList<Transaction> validTransactions = new ArrayList<Transaction>();
+        ArrayList<Transaction> validTransactionsWithFee = new ArrayList<Transaction>();
         
         for (int i=0; i<possibleTxs.length; i++) {
             Transaction tx = possibleTxs[i];
-            if (isValidTx(tx)) {
-                validTransactions.add(tx);
-                
-                for (int j=0; j<tx.numInputs(); j++) {
-                    Transaction.Input input = tx.getInput(j);
-                    UTXO utxo = new UTXO(input.prevTxHash, input.outputIndex);
-                    this.utxoPool.removeUTXO(utxo);
-                }
-                
-                for (int j=0; j<tx.numOutputs(); j++) {
-                    Transaction.Output output = tx.getOutput(j);
-                    UTXO utxo = new UTXO(tx.getRawTx(), j);
-                    this.utxoPool.addUTXO(utxo, output);
-                }
-            }
+            double fee = isValidTx(tx);
+            
+            // DO CALCULATIONS
         }
         
-        return (Transaction[]) validTransactions.toArray();
+        return (Transaction[]) validTransactionsWithFee.toArray();
     }
-
+    
 }
