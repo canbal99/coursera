@@ -1,12 +1,10 @@
-package assignment1;
-
-import assignment1.Transaction;
 import java.security.PublicKey;
 import java.util.ArrayList;
+import java.util.Arrays;
 
 public class TxHandler {
     
-    private UTXOPool utxoPool;
+    protected UTXOPool utxoPool;
 
     /**
      * Creates a public ledger whose current UTXOPool (collection of unspent transaction outputs) is
@@ -26,9 +24,10 @@ public class TxHandler {
      * (5) the sum of {@code tx}s input values is greater than or equal to the sum of its output
      *     values; and false otherwise.
      */
-    public boolean isValidTx(Transaction tx) {
+    public double calculateFee(Transaction tx) {
         double sumOfInputValues = 0;
         double sumOfOutputValues = 0;
+        UTXOPool utxoPoolSpentOnThisTransaction = new UTXOPool();
         
         for (int i = 0; i < tx.numInputs(); i++) {
             
@@ -36,24 +35,22 @@ public class TxHandler {
             byte[] prevTransactionHash = input.prevTxHash;
             int prevOutputIndex = input.outputIndex;
             UTXO utxo = new UTXO(prevTransactionHash, prevOutputIndex);
-            if (!this.utxoPool.contains(utxo)) { // case (1)
-                return false;
+            if (!this.utxoPool.contains(utxo)) {
+                return -1; // case (1)
             }
             
             Transaction.Output prevOutput = this.utxoPool.getTxOutput(utxo);
             PublicKey pubKey = prevOutput.address;
             byte[] message = tx.getRawDataToSign(i);
             byte[] signature = input.signature;
-            if (!Crypto.verifySignature(pubKey, message, signature)) { // case (2)
-                return false;
+            if (!Crypto.verifySignature(pubKey, message, signature)) {
+                return -1; // case (2)
             }
             
-            for (int j = i+1; j < tx.numInputs(); j++) {
-                Transaction.Input anotherInputInList = tx.getInput(j);
-                UTXO anotherUtxo = new UTXO(anotherInputInList.prevTxHash, anotherInputInList.outputIndex);
-                if (utxo.equals(anotherUtxo)) { // case (3)
-                    return false;
-                }
+            if (utxoPoolSpentOnThisTransaction.contains(utxo)) {
+                return -1; // case (3)
+            } else {
+                utxoPoolSpentOnThisTransaction.addUTXO(utxo, null);
             }
             
             sumOfInputValues += prevOutput.value;
@@ -63,18 +60,22 @@ public class TxHandler {
             
             Transaction.Output output = tx.getOutput(i);
             
-            if (output.value<0) { // case (4)
-                return false;
+            if (output.value<0) {
+                return -1; // case (4)
             }
             
             sumOfOutputValues += output.value;
         }
         
-        if (sumOfInputValues < sumOfOutputValues) { // case (5)
-            return false;
+        if (sumOfInputValues < sumOfOutputValues) {
+            return -1; // case (5)
         }
         
-        return true;
+        return sumOfInputValues - sumOfOutputValues;
+    }
+    
+    public boolean isValidTx(Transaction tx) {        
+        return calculateFee(tx)>=0;
     }
 
     /**
@@ -84,28 +85,43 @@ public class TxHandler {
      */
     public Transaction[] handleTxs(Transaction[] possibleTxs) {
         
+        ArrayList<Transaction> possibleTransactions = new ArrayList<Transaction>(Arrays.asList(possibleTxs));
         ArrayList<Transaction> validTransactions = new ArrayList<Transaction>();
+        Boolean foundOneMoreValidTransaction = true;
         
-        for (int i=0; i<possibleTxs.length; i++) {
-            Transaction tx = possibleTxs[i];
-            if (isValidTx(tx)) {
-                validTransactions.add(tx);
-                
-                for (int j=0; j<tx.numInputs(); j++) {
-                    Transaction.Input input = tx.getInput(j);
-                    UTXO utxo = new UTXO(input.prevTxHash, input.outputIndex);
-                    this.utxoPool.removeUTXO(utxo);
-                }
-                
+        while (foundOneMoreValidTransaction) {
+            foundOneMoreValidTransaction = false;
+            for (int i=0; i<possibleTransactions.size(); i++) {
+                Transaction tx = possibleTransactions.get(i);
+                // can also use outputs of current transaction, so add them before starting to process
                 for (int j=0; j<tx.numOutputs(); j++) {
                     Transaction.Output output = tx.getOutput(j);
                     UTXO utxo = new UTXO(tx.getRawTx(), j);
                     this.utxoPool.addUTXO(utxo, output);
                 }
+                if (isValidTx(tx)) {
+                    foundOneMoreValidTransaction = true;
+                    validTransactions.add(tx);
+                    possibleTransactions.remove(i);
+                    i = i - 1;
+                    // remove unspent outputs that are used in this valid transaction
+                    for (int j=0; j<tx.numInputs(); j++) {
+                        Transaction.Input input = tx.getInput(j);
+                        UTXO utxo = new UTXO(input.prevTxHash, input.outputIndex);
+                        this.utxoPool.removeUTXO(utxo);
+                    }
+                } else {
+                    // removed previously added outputs of this invalid transaction)
+                    for (int j = 0; j < tx.numOutputs(); j++) {
+                        Transaction.Output output = tx.getOutput(j);
+                        UTXO utxo = new UTXO(tx.getRawTx(), j);
+                        this.utxoPool.removeUTXO(utxo);
+                    }
+                }
             }
         }
         
-        return (Transaction[]) validTransactions.toArray();
+        return validTransactions.toArray(new Transaction[validTransactions.size()]);
     }
 
 }
