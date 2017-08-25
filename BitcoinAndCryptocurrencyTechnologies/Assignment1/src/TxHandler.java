@@ -24,7 +24,7 @@ public class TxHandler {
      * (5) the sum of {@code tx}s input values is greater than or equal to the sum of its output
      *     values; and false otherwise.
      */
-    public double calculateFee(Transaction tx) {
+    public boolean isValidTx(Transaction tx) {
         double sumOfInputValues = 0;
         double sumOfOutputValues = 0;
         UTXOPool utxoPoolSpentOnThisTransaction = new UTXOPool();
@@ -36,7 +36,7 @@ public class TxHandler {
             int prevOutputIndex = input.outputIndex;
             UTXO utxo = new UTXO(prevTransactionHash, prevOutputIndex);
             if (!this.utxoPool.contains(utxo)) {
-                return -1; // case (1)
+                return false; // case (1)
             }
             
             Transaction.Output prevOutput = this.utxoPool.getTxOutput(utxo);
@@ -44,11 +44,11 @@ public class TxHandler {
             byte[] message = tx.getRawDataToSign(i);
             byte[] signature = input.signature;
             if (!Crypto.verifySignature(pubKey, message, signature)) {
-                return -1; // case (2)
+                return false; // case (2)
             }
             
             if (utxoPoolSpentOnThisTransaction.contains(utxo)) {
-                return -1; // case (3)
+                return false; // case (3)
             } else {
                 utxoPoolSpentOnThisTransaction.addUTXO(utxo, null);
             }
@@ -61,21 +61,17 @@ public class TxHandler {
             Transaction.Output output = tx.getOutput(i);
             
             if (output.value<0) {
-                return -1; // case (4)
+                return false; // case (4)
             }
             
             sumOfOutputValues += output.value;
         }
         
         if (sumOfInputValues < sumOfOutputValues) {
-            return -1; // case (5)
+            return false; // case (5)
         }
         
-        return sumOfInputValues - sumOfOutputValues;
-    }
-    
-    public boolean isValidTx(Transaction tx) {        
-        return calculateFee(tx)>=0;
+        return true;
     }
 
     /**
@@ -96,7 +92,7 @@ public class TxHandler {
                 // can also use outputs of current transaction, so add them before starting to process
                 for (int j=0; j<tx.numOutputs(); j++) {
                     Transaction.Output output = tx.getOutput(j);
-                    UTXO utxo = new UTXO(tx.getRawTx(), j);
+                    UTXO utxo = new UTXO(tx.getHash(), j);
                     this.utxoPool.addUTXO(utxo, output);
                 }
                 if (isValidTx(tx)) {
@@ -114,7 +110,7 @@ public class TxHandler {
                     // removed previously added outputs of this invalid transaction)
                     for (int j = 0; j < tx.numOutputs(); j++) {
                         Transaction.Output output = tx.getOutput(j);
-                        UTXO utxo = new UTXO(tx.getRawTx(), j);
+                        UTXO utxo = new UTXO(tx.getHash(), j);
                         this.utxoPool.removeUTXO(utxo);
                     }
                 }
