@@ -224,8 +224,10 @@ public class MaxFeeTxHandler {
         double maxFee = -1;
         ArrayList<ArrayList<TransactionWithFee>> allCombinations = combination(possibleTransactionsWithFee, possibleTransactionsWithFee.size());
         for (int i=0;i<allCombinations.size();i++) {
-            ArrayList<TransactionWithFee> list = allCombinations[i];
-            for (int j=0;j<)
+            ArrayList<TransactionWithFee> list = allCombinations.get(i);
+            for (int j=0;j<list.size();i++) {
+                
+            }
         }
         
         
