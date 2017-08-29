@@ -11,12 +11,14 @@ import java.util.HashMap;
 
 public class Simulation {
 
-   public static void main(String[] args) {
+   public static void main(String[] args0) {
 
       // There are four required command line arguments: p_graph (.1, .2, .3),
       // p_malicious (.15, .30, .45), p_txDistribution (.01, .05, .10), 
       // and numRounds (10, 20). You should try to test your CompliantNode
       // code for all 3x3x3x2 = 54 combinations.
+      
+      String args[] = { "0.1", "0.15"," 0.01", "10" };
 
       int numNodes = 100;
       double p_graph = Double.parseDouble(args[0]); // parameter for random graph: prob. that an edge will exist
@@ -30,7 +32,7 @@ public class Simulation {
          if(Math.random() < p_malicious)
             // When you are ready to try testing with malicious nodes, replace the
             // instantiation below with an instantiation of a MaliciousNode
-            nodes[i] = new MalDoNothing(p_graph, p_malicious, p_txDistribution, numRounds);
+            nodes[i] = new MaliciousNode(p_graph, p_malicious, p_txDistribution, numRounds);
          else
             nodes[i] = new CompliantNode(p_graph, p_malicious, p_txDistribution, numRounds);
       }
