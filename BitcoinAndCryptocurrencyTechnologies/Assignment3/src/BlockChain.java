@@ -2,33 +2,113 @@
 // You should not have all the blocks added to the block chain in memory 
 // as it would cause a memory overflow.
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
 public class BlockChain {
+    
+    public class BlockUTXOPool {
+
+        private final Block block;
+        private UTXOPool utxoPool;
+
+        public BlockUTXOPool(Block b, UTXOPool p) {
+            block = b;
+            utxoPool = p==null ? new UTXOPool() : new UTXOPool(p);
+        }
+
+        public Block getBlock() {
+            return block;
+        }
+
+        public UTXOPool getUtxoPool() {
+            return utxoPool;
+        }
+        
+        public void releaseCoinbaseOutput() {
+            for (int i=0;i<block.getCoinbase().numOutputs();i++) {
+                UTXO utxo = new UTXO(block.getCoinbase().getHash(),i);
+                utxoPool.addUTXO(utxo, block.getCoinbase().getOutput(i));
+            }
+        }
+    }
+
+    public class Node<T> {
+
+        private T data;
+        private Node<T> parent;
+        private List<Node<T>> children;
+        private int height;
+
+        public Node(T data) {
+            this.data = data;
+            this.children = new ArrayList<Node<T>>();
+            this.height = 1;
+        }
+
+        public void addNode(Node<T> node) {
+            node.height = this.height+1;
+            this.children.add(node);
+        }
+
+        public T data() {
+            return data;
+        }
+        
+        public int hegiht() {
+            return height;
+        }
+        
+        public Node<T> getMaxHeightNode() {
+            Node<T> maxHeightNode = this;
+            for (Node<T> node : this.children) {
+                Node<T> maxHeightNodeChild = node.getMaxHeightNode();
+                if (maxHeightNode.height < maxHeightNodeChild.height) { // case 2
+                    maxHeightNode = maxHeightNodeChild;
+                }
+            }
+            return maxHeightNode;
+        }
+    }
+
     public static final int CUT_OFF_AGE = 10;
+    private final TransactionPool transactionPool;
+    private final Node<BlockUTXOPool> treeBlockChain;
+    private final HashMap<ByteArrayWrapper,Node<BlockUTXOPool>> hashMapBlockChain;
 
     /**
      * create an empty block chain with just a genesis block. Assume {@code genesisBlock} is a valid
      * block
      */
     public BlockChain(Block genesisBlock) {
-        // IMPLEMENT THIS
+        this.transactionPool = new TransactionPool();
+        this.hashMapBlockChain = new HashMap<ByteArrayWrapper,Node<BlockUTXOPool>>();
+        
+        BlockUTXOPool bp = new BlockUTXOPool(genesisBlock, new UTXOPool());
+        bp.releaseCoinbaseOutput();
+        this.treeBlockChain = new Node<BlockUTXOPool>(bp);
+        ByteArrayWrapper genesisItemHash = new ByteArrayWrapper(this.treeBlockChain.data.block.getHash());
+        this.hashMapBlockChain.put(genesisItemHash, this.treeBlockChain);
+        
+        for (Transaction tx : genesisBlock.getTransactions()) { // case 4
+            this.transactionPool.removeTransaction(tx.getHash());
+        }
     }
 
     /** Get the maximum height block */
     public Block getMaxHeightBlock() {
-        // IMPLEMENT THIS
-        return null;
+        return this.treeBlockChain.getMaxHeightNode().data().getBlock();
     }
 
     /** Get the UTXOPool for mining a new block on top of max height block */
     public UTXOPool getMaxHeightUTXOPool() {
-        // IMPLEMENT THIS
-        return null;
+        return this.treeBlockChain.getMaxHeightNode().data().getUtxoPool();
     }
 
     /** Get the transaction pool to mine a new block */
     public TransactionPool getTransactionPool() {
-        // IMPLEMENT THIS
-        return null;
+        return this.transactionPool;
     }
 
     /**
@@ -44,12 +124,40 @@ public class BlockChain {
      * @return true if block is successfully added
      */
     public boolean addBlock(Block block) {
-        // IMPLEMENT THIS
-        return false;
+        if (block.getPrevBlockHash()==null || block.getPrevBlockHash().length==0) {
+            return false; // case 1
+        }
+        
+        ByteArrayWrapper parentItemHash = new ByteArrayWrapper(block.getPrevBlockHash());
+        Node<BlockUTXOPool> parent = this.hashMapBlockChain.get(parentItemHash);
+        if (parent==null || parent.hegiht()>CUT_OFF_AGE) {
+            return false;
+        }
+        
+        // case 3: nothing TODO
+        // case 5: nothing TODO
+        
+        TxHandler txHandler = new TxHandler(parent.data().getUtxoPool());
+        Transaction[] validTxArray = txHandler.handleTxs(block.getTransactions().toArray(new Transaction[block.getTransactions().size()]));
+        if (validTxArray.length != block.getTransactions().size()) {
+            return false; // case 6
+        }
+        
+        for (Transaction tx : block.getTransactions()) { // case 4
+            this.transactionPool.removeTransaction(tx.getHash());
+        }
+        
+        BlockUTXOPool bp = new BlockUTXOPool(block, txHandler.getUTXOPool());
+        bp.releaseCoinbaseOutput();
+        Node<BlockUTXOPool> newTreeItem = new Node<BlockUTXOPool>(bp);
+        parent.addNode(newTreeItem);
+        this.hashMapBlockChain.put(new ByteArrayWrapper(block.getHash()), newTreeItem);
+
+        return true;
     }
 
     /** Add a transaction to the transaction pool */
     public void addTransaction(Transaction tx) {
-        // IMPLEMENT THIS
+        this.transactionPool.addTransaction(tx);
     }
 }
