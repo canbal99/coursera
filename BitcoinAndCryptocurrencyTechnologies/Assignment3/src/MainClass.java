@@ -27,17 +27,17 @@ public class MainClass {
         KeyPair rk2 = keyGen.genKeyPair();
 
         Block genBlock = new Block(null, rk.getPublic());
-        //genBlock.finalize();
+        genBlock.finalize();
         BlockChain bc = new BlockChain(genBlock);
 
         Transaction tx = new Transaction();
         tx.addInput(genBlock.getCoinbase().getHash(), 0);
         tx.addOutput(25, rk2.getPublic());
-        //tx.finalize();
+        tx.finalize();
 
         Block block2 = new Block(genBlock.getHash(), rk.getPublic());
         block2.addTransaction(tx);
-        //block2.finalize();
+        block2.finalize();
         bc.addBlock(block2);
         } catch (Exception e) {
             System.out.println(e.getLocalizedMessage());

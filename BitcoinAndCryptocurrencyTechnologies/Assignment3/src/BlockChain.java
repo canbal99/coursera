@@ -74,7 +74,6 @@ public class BlockChain {
         this.transactionPool = new TransactionPool();
         this.hashMapBlockChain = new HashMap<ByteArrayWrapper,Node<BlockUTXOPool>>();
         
-        genesisBlock.finalize();
         BlockUTXOPool bp = new BlockUTXOPool(genesisBlock, new UTXOPool());
         bp.releaseCoinbaseOutput();
         this.maxHeightBlock = new Node<BlockUTXOPool>(bp);
@@ -118,19 +117,21 @@ public class BlockChain {
             return false; // case 1
         }
         
+        ByteArrayWrapper newItemHash = new ByteArrayWrapper(block.getHash());
+        if (this.hashMapBlockChain.containsKey(newItemHash )) {
+            return false;
+        }
+        
         ByteArrayWrapper parentItemHash = new ByteArrayWrapper(block.getPrevBlockHash());
         Node<BlockUTXOPool> parent = this.hashMapBlockChain.get(parentItemHash);
-        if (parent==null || parent.height()>CUT_OFF_AGE) {
+        if (parent==null) {
+            return false;
+        } else if (parent.height()>CUT_OFF_AGE) {
             return false;
         }
         
         // case 3: nothing TODO
         // case 5: nothing TODO
-        
-        block.finalize();
-        for (Transaction tx : block.getTransactions()) {
-            tx.finalize();
-        }
         
         TxHandler txHandler = new TxHandler(parent.data().getUtxoPool());
         Transaction[] validTxArray = txHandler.handleTxs(block.getTransactions().toArray(new Transaction[block.getTransactions().size()]));
@@ -146,7 +147,7 @@ public class BlockChain {
         bp.releaseCoinbaseOutput();
         Node<BlockUTXOPool> newTreeItem = new Node<BlockUTXOPool>(bp);
         parent.addNode(newTreeItem);
-        this.hashMapBlockChain.put(new ByteArrayWrapper(block.getHash()), newTreeItem);
+        this.hashMapBlockChain.put(newItemHash, newTreeItem);
         if (newTreeItem.height() > this.maxHeightBlock.height())
             this.maxHeightBlock = newTreeItem;
 
