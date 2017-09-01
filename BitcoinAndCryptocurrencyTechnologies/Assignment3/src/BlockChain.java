@@ -7,6 +7,18 @@ import java.util.HashMap;
 import java.util.List;
 
 public class BlockChain {
+
+    private static final boolean DEBUG = false;
+    private final static char[] hexArray = "0123456789ABCDEF".toCharArray();
+    private static String bytesToHex(byte[] bytes) {
+        char[] hexChars = new char[bytes.length * 2];
+        for (int j = 0; j < bytes.length; j++) {
+            int v = bytes[j] & 0xFF;
+            hexChars[j * 2] = hexArray[v >>> 4];
+            hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+        }
+        return new String(hexChars);
+    }
     
     public class BlockUTXOPool {
 
@@ -71,6 +83,8 @@ public class BlockChain {
      * block
      */
     public BlockChain(Block genesisBlock) {
+        if (DEBUG) {System.err.println(" ");}
+        if (DEBUG) {System.err.println("BlockChain constructor called");}
         this.transactionPool = new TransactionPool();
         this.hashMapBlockChain = new HashMap<ByteArrayWrapper,Node<BlockUTXOPool>>();
         
@@ -83,20 +97,24 @@ public class BlockChain {
         for (Transaction tx : genesisBlock.getTransactions()) { // case 4
             this.transactionPool.removeTransaction(tx.getHash());
         }
+        if (DEBUG) {System.err.println("BlockChain constructed with genesis " + bytesToHex(genesisBlock.getHash()));}
     }
 
     /** Get the maximum height block */
     public Block getMaxHeightBlock() {
+        if (DEBUG) {System.err.println("getMaxHeightBlock called");}
         return this.maxHeightBlock.data().getBlock();
     }
 
     /** Get the UTXOPool for mining a new block on top of max height block */
     public UTXOPool getMaxHeightUTXOPool() {
+        if (DEBUG) {System.err.println("getMaxHeightUTXOPool called");}
         return this.maxHeightBlock.data().getUtxoPool();
     }
 
     /** Get the transaction pool to mine a new block */
     public TransactionPool getTransactionPool() {
+        if (DEBUG) {System.err.println("getTransactionPool called");}
         return this.transactionPool;
     }
 
@@ -113,20 +131,31 @@ public class BlockChain {
      * @return true if block is successfully added
      */
     public boolean addBlock(Block block) {
+        if (DEBUG) {System.err.println("addBlock called " + bytesToHex(block.getHash())
+                + " txCount:" + block.getTransactions().size()
+                + " coinbase:" + block.getCoinbase().getOutputs().size()
+                + " new:" + (block.getCoinbase().getOutputs().size()>0?block.getCoinbase().getOutput(0).value:0)
+                + " parent:" + (block.getPrevBlockHash()==null ? "null" : bytesToHex(block.getPrevBlockHash()))
+                + "");}
+        
         if (block.getPrevBlockHash()==null || block.getPrevBlockHash().length==0) {
+            if (DEBUG) {System.err.println("case1 failed");}
             return false; // case 1
         }
         
         ByteArrayWrapper newItemHash = new ByteArrayWrapper(block.getHash());
         if (this.hashMapBlockChain.containsKey(newItemHash )) {
+            if (DEBUG) {System.err.println("block already exists");}
             return false;
         }
         
         ByteArrayWrapper parentItemHash = new ByteArrayWrapper(block.getPrevBlockHash());
         Node<BlockUTXOPool> parent = this.hashMapBlockChain.get(parentItemHash);
         if (parent==null) {
+            if (DEBUG) {System.err.println("No parent found");}
             return false;
         } else if (parent.height()>CUT_OFF_AGE) {
+            if (DEBUG) {System.err.println("CUT_OFF_AGE failed");}
             return false;
         }
         
@@ -136,12 +165,14 @@ public class BlockChain {
         TxHandler txHandler = new TxHandler(parent.data().getUtxoPool());
         Transaction[] validTxArray = txHandler.handleTxs(block.getTransactions().toArray(new Transaction[block.getTransactions().size()]));
         if (validTxArray.length != block.getTransactions().size()) {
+            if (DEBUG) {System.err.println("case6 failed");}
             return false; // case 6
         }
         
         for (Transaction tx : block.getTransactions()) { // case 4
             this.transactionPool.removeTransaction(tx.getHash());
         }
+        if (DEBUG) {System.err.println("case4 completed");}
         
         BlockUTXOPool bp = new BlockUTXOPool(block, txHandler.getUTXOPool());
         bp.releaseCoinbaseOutput();
@@ -151,11 +182,13 @@ public class BlockChain {
         if (newTreeItem.height() > this.maxHeightBlock.height())
             this.maxHeightBlock = newTreeItem;
 
+        if (DEBUG) {System.err.println("block successfully added");}
         return true;
     }
 
     /** Add a transaction to the transaction pool */
     public void addTransaction(Transaction tx) {
+        if (DEBUG) {System.err.println("addTransaction called");}
         this.transactionPool.addTransaction(tx);
     }
 }
