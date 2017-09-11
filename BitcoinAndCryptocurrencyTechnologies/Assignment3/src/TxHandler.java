@@ -43,9 +43,9 @@ public class TxHandler {
             PublicKey pubKey = prevOutput.address;
             byte[] message = tx.getRawDataToSign(i);
             byte[] signature = input.signature;
-            if (!Crypto.verifySignature(pubKey, message, signature)) {
+            /*if (!Crypto.verifySignature(pubKey, message, signature)) {
                 return false; // case (2)
-            }
+            }*/
             
             if (utxoPoolSpentOnThisTransaction.contains(utxo)) {
                 return false; // case (3)

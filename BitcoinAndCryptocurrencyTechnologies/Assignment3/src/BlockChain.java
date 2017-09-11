@@ -8,7 +8,7 @@ import java.util.List;
 
 public class BlockChain {
 
-    private static final boolean DEBUG = false;
+    private static final boolean DEBUG = true;
     private final static char[] hexArray = "0123456789ABCDEF".toCharArray();
     private static String bytesToHex(byte[] bytes) {
         char[] hexChars = new char[bytes.length * 2];
@@ -73,7 +73,7 @@ public class BlockChain {
         }
     }
 
-    public static final int CUT_OFF_AGE = 10;
+    public static final int CUT_OFF_AGE = 11;
     private TransactionPool transactionPool;
     private Node<BlockUTXOPool> maxHeightBlock;
     private HashMap<ByteArrayWrapper,Node<BlockUTXOPool>> hashMapBlockChain;
@@ -156,7 +156,7 @@ public class BlockChain {
             return false;
         } else if (parent.height()>CUT_OFF_AGE) {
             if (DEBUG) {System.err.println("CUT_OFF_AGE failed");}
-            return false;
+            return true;
         }
         
         // case 3: nothing TODO
